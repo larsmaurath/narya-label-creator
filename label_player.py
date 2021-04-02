@@ -29,6 +29,7 @@ st.write('If the image is not usable you can delete it with "Delete Image". To g
 p_col1, p_col2, p_col_, p_col3 = st.beta_columns([2,1,0.5,1])
 
 with p_col2:
+    object_to_label = st.selectbox('Player or Ball?', ('Player', 'Ball'))
     update = st.button('Accept Data')
     store = st.button('Store Results')
     delete = st.button('Delete Image')
@@ -37,11 +38,13 @@ with p_col2:
 image2 = image.get_image(original)
 height2 = image2.height
 width2 = image2.width
+stroke_color = '#0000FF' if object_to_label == 'Ball' else '#000000'
+
 with p_col1:
     canvas_converted = st_canvas(
         fill_color = 'rgba(255, 165, 0, 0.3)',
         stroke_width = 2,
-        stroke_color = '#000000',
+        stroke_color = stroke_color,
         background_image = image2,
         drawing_mode = 'rect',
         update_streamlit = update,
@@ -53,15 +56,17 @@ with p_col1:
 if canvas_converted.json_data is not None:
     if len(canvas_converted.json_data['objects'])>0:
         dfCoords = pd.json_normalize(canvas_converted.json_data['objects'])
+        
         if original:
             dfCoords['xmin'] = dfCoords['left']
             dfCoords['xmax'] = dfCoords['left'] + dfCoords['width']
             dfCoords['ymin'] = dfCoords['top']
             dfCoords['ymax'] = dfCoords['top'] + dfCoords['height']
+            dfCoords['entity'] = ['Ball' if x == '#0000FF' else 'Player' for x in dfCoords['stroke']]
 
     with p_col3:
         st.write('Player Coordinates:')
-        st.dataframe(dfCoords[['xmin', 'xmax', 'ymin', 'ymax']])
+        st.dataframe(dfCoords[['xmin', 'xmax', 'ymin', 'ymax', 'entity']])
         
 if store:
     os.remove(os.path.join(path, file))
@@ -77,7 +82,7 @@ if store:
     
     for index, row in dfCoords.iterrows(): 
         object = ET.SubElement(annotation, 'object')
-        ET.SubElement(object, 'name').text = 'Player'
+        ET.SubElement(object, 'name').text = row['entity']
         ET.SubElement(object, "difficult").text = "0"
         bndbox = ET.SubElement(object, 'bndbox')
         ET.SubElement(bndbox, 'xmin').text = str(int(row['xmin'])*2)
